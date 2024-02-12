@@ -1,0 +1,5 @@
+spring:
+  application.name: Report-Manager-Application
+  jackson:
+    serialization:
+      write-dates-as-timestamps: true
