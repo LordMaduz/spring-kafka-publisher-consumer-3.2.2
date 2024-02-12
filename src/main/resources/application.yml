@@ -1,5 +1,5 @@
 spring:
-  application.name: Report-Manager-Application
+  application.name: Spring-Kafka-Application
   jackson:
     serialization:
       write-dates-as-timestamps: true
