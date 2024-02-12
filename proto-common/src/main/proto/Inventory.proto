@@ -1,0 +1,8 @@
+syntax = "proto3";
+option java_package = "com.spring.kafka";
+option java_outer_classname = "InventoryProto";
+
+message Inventory {
+  string inventoryId = 1;
+  string name = 2;
+}
