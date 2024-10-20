@@ -4,6 +4,7 @@ import com.spring.kafka.InventoryProto;
 import com.spring.kafka.mapper.InventoryProtoMapper;
 import com.spring.kafka.model.Inventory;
 import com.spring.kafka.model.Order;
+import com.spring.kafka.model.avro.TransactionEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.SerializationUtils;
@@ -21,7 +22,7 @@ public class KafkaEventListener {
     private final InventoryProtoMapper inventoryProtoMapper;
 
     @Transactional
-    @KafkaListener(id = "ORDER_PROCESSED_GROUP", topics = "order-event",
+    @KafkaListener(id = "ORDER_PROCESSED_GROUP", topics = "json-event-topic",
             containerFactory = "jsonKafkaListenerContainerFactory")
     public void onJsonEventReceived(ConsumerRecord<String, Order> record,
                                      Acknowledgment acknowledgment) {
@@ -31,7 +32,7 @@ public class KafkaEventListener {
     }
 
     @Transactional
-    @KafkaListener(id = "BYTE_ARRAY_GROUP", topics = "byteChannel",
+    @KafkaListener(id = "BYTE_ARRAY_GROUP", topics = "byte-event-topic",
             containerFactory = "byteArrayKafkaListenerContainerFactory")
     public void onByteArrayEventReceived(ConsumerRecord<String, byte[]> record,
                                      Acknowledgment acknowledgment) {
@@ -41,12 +42,21 @@ public class KafkaEventListener {
     }
 
     @Transactional
-    @KafkaListener(id = "INVENTORY_UPDATED_GROUP", topics = "inventory-event",
+    @KafkaListener(id = "INVENTORY_UPDATED_GROUP", topics = "proto-event-topic",
             containerFactory = "protoKafkaListenerContainerFactory")
     public void onProtoEventReceived(ConsumerRecord<String, InventoryProto.Inventory> record,
                                          Acknowledgment acknowledgment) {
         Inventory inventory = inventoryProtoMapper.fromProto(record.value());
         log.info("Inventory Updated Event Received: {}", inventory);
         acknowledgment.acknowledge();
+    }
+
+    @Transactional
+    @KafkaListener(id = "TRANSACTION_UPDATED_GROUP", topics = "avro-event-topic",
+        containerFactory = "avroKafkaListenerContainerFactory")
+    public void onAvroEventReceived(ConsumerRecord<String, TransactionEvent> record,
+        Acknowledgment acknowledgment) {
+            log.info("Inventory Updated Event Received: {}", record.value());
+            acknowledgment.acknowledge();
     }
 }

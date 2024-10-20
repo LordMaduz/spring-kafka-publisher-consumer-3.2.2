@@ -1,7 +1,6 @@
 package com.spring.kafka.kafka;
 
-import com.spring.kafka.InventoryProto;
-import com.spring.kafka.model.Order;
+import io.confluent.kafka.serializers.KafkaAvroSerializer;
 import io.confluent.kafka.serializers.protobuf.KafkaProtobufSerializer;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.ByteArraySerializer;
@@ -20,8 +19,13 @@ import org.springframework.kafka.support.serializer.JsonSerializer;
 import java.util.*;
 import java.util.regex.Pattern;
 
+import com.spring.kafka.InventoryProto;
+import com.spring.kafka.model.Order;
+import com.spring.kafka.model.avro.TransactionEvent;
+
 @Configuration
 public class KafkaProducerConfig extends KafkaBasicConfig {
+
     @Bean
     public ProducerFactory<Object, Object> producerFactory() {
         final Map<String, Object> props = getBasicConfig();
@@ -38,20 +42,24 @@ public class KafkaProducerConfig extends KafkaBasicConfig {
         props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
         props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
 
-        final DefaultKafkaProducerFactory<Object, Object> producerFactory = new DefaultKafkaProducerFactory<>(props, null,
+        final DefaultKafkaProducerFactory<Object, Object> producerFactoryByDelegatingByTopic = new DefaultKafkaProducerFactory<>(props, null,
                 new DelegatingByTopicSerializer(
                         Map.of(
-                                Pattern.compile("inventory-event"), new KafkaProtobufSerializer<>(),
-                                Pattern.compile("order-event"), new JsonSerializer<>()),
+
+                                Pattern.compile("proto-event-topic"), new KafkaProtobufSerializer<>(),
+                                Pattern.compile("json-event-topic"), new JsonSerializer<>(),
+                                Pattern.compile("avro-event-topic"), new KafkaAvroSerializer()),
                         new ByteArraySerializer()));
 
-//        final DefaultKafkaProducerFactory<Object, Object> producerFactory = new DefaultKafkaProducerFactory<>(props, null,
-//                new DelegatingByTypeSerializer(
-//                        Map.of(
-//                                InventoryProto.Inventory.class, new KafkaProtobufSerializer<>(),
-//                                Order.class, new JsonSerializer<>())));
+        final DefaultKafkaProducerFactory<Object, Object> producerFactoryDelegatingByType = new DefaultKafkaProducerFactory<>(props, null,
+                new DelegatingByTypeSerializer(
+                        Map.of(
+                                InventoryProto.Inventory.class, new KafkaProtobufSerializer<>(),
+                                Byte.class, new ByteArraySerializer(),
+                                TransactionEvent.class, new KafkaAvroSerializer(),
+                                Order.class, new JsonSerializer<>())));
 
-        return producerFactory;
+        return producerFactoryByDelegatingByTopic;
     }
 
     @Bean
@@ -75,6 +83,10 @@ public class KafkaProducerConfig extends KafkaBasicConfig {
         return new KafkaTemplate<>(producerFactory(), Collections.singletonMap(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaProtobufSerializer.class));
     }
 
+    @Bean
+    public KafkaTemplate<?, ?> avroKafkaTemplate(final ProducerFactory<?, ?> producerFactory) {
+        return new KafkaTemplate<>(producerFactory(), Collections.singletonMap(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class));
+    }
 
     @Bean
     public RoutingKafkaTemplate routingTemplate(GenericApplicationContext context,
@@ -88,9 +100,14 @@ public class KafkaProducerConfig extends KafkaBasicConfig {
         final DefaultKafkaProducerFactory<Object, Object> byteArrayProducerFactory = byteArrayProducerFactory(producerFactory);
         context.registerBean("byteArrayProducerFactory", DefaultKafkaProducerFactory.class, () -> byteArrayProducerFactory);
 
+
+        final DefaultKafkaProducerFactory<Object, Object> avroProducerFactory = avroProducerFactory(producerFactory);
+        context.registerBean("avroProducerFactory", DefaultKafkaProducerFactory.class, () -> avroProducerFactory);
+
         Map<Pattern, ProducerFactory<Object, Object>> map = new LinkedHashMap<>();
-        map.put(Pattern.compile("order-event"), producerFactory);
-        map.put(Pattern.compile("inventory-event"), protoProducerFactory);
+        map.put(Pattern.compile("json-event-topic"), producerFactory);
+        map.put(Pattern.compile("proto-event-topic"), protoProducerFactory);
+        map.put(Pattern.compile("avro-event-topic"), avroProducerFactory);
         map.put(Pattern.compile(".+"), byteArrayProducerFactory);
         return new RoutingKafkaTemplate(map);
     }
@@ -101,6 +118,14 @@ public class KafkaProducerConfig extends KafkaBasicConfig {
 
         return new DefaultKafkaProducerFactory<>(config);
     }
+
+    private DefaultKafkaProducerFactory<Object, Object> avroProducerFactory(ProducerFactory<Object, Object> producerFactory) {
+        final Map<String, Object> config = new HashMap<>(producerFactory.getConfigurationProperties());
+        config.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, KafkaAvroSerializer.class);
+
+        return new DefaultKafkaProducerFactory<>(config);
+    }
+
 
     private DefaultKafkaProducerFactory<Object, Object> byteArrayProducerFactory(ProducerFactory<Object, Object> producerFactory) {
         final Map<String, Object> config = new HashMap<>(producerFactory.getConfigurationProperties());

@@ -15,6 +15,8 @@
 	<description>Spring Kafka Application</description>
 	<properties>
 		<java.version>21</java.version>
+		<apache-avro.version>1.11.3</apache-avro.version>
+		<avro-maven-plugin.version>1.11.0</avro-maven-plugin.version>
 	</properties>
 
 	<dependencies>
@@ -53,10 +55,25 @@
 			<version>1.0.0.</version>
 		</dependency>
 
+		<dependency>
+			<groupId>org.apache.avro</groupId>
+			<artifactId>avro</artifactId>
+			<version>${apache-avro.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.confluent</groupId>
+			<artifactId>kafka-avro-serializer</artifactId>
+			<version>7.5.0</version>
+		</dependency>
+
 
 	</dependencies>
 
 	<build>
+		<finalName>kafka-demo-app-${project.version}</finalName>
+		<sourceDirectory>src/main/java</sourceDirectory>
+		<testSourceDirectory>src/test/java</testSourceDirectory>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -70,13 +87,33 @@
 					</excludes>
 				</configuration>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.avro</groupId>
+				<artifactId>avro-maven-plugin</artifactId>
+				<version>${avro-maven-plugin.version}</version>
+				<executions>
+					<execution>
+						<id>avro</id>
+						<phase>generate-sources</phase>
+						<goals>
+							<goal>schema</goal>
+						</goals>
+						<configuration>
+							<sourceDirectory>${project.basedir}/src/main/resources/avro/</sourceDirectory>
+							<outputDirectory>${project.basedir}/src/main/java</outputDirectory>
+							<stringType>String</stringType>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
-
 	<repositories>
 		<repository>
 			<id>confluent</id>
+			<name>confluent</name>
 			<url>https://packages.confluent.io/maven/</url>
+			<layout>default</layout>
 		</repository>
 	</repositories>
 
